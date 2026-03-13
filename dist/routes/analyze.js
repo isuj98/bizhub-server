@@ -70,9 +70,9 @@ analyzeRouter.post('/', requireAuthWhenDb, async (req, res) => {
                     return;
                 }
                 businessName = business.name;
-                businessType = business.business_type;
-                websiteUrlRaw = business.website_url;
-                apiEndpoint = business.api_endpoint;
+                businessType = business.business_type ?? undefined;
+                websiteUrlRaw = business.website_url ?? undefined;
+                apiEndpoint = business.api_endpoint ?? undefined;
             }
             else {
                 const business = getBusinessById(businessId);
