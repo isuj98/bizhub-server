@@ -42,9 +42,9 @@ hubsRouter.post('/from-business/:businessId', async (req: Request, res: Response
     }
     const hub = await createHubFromBusiness(business.userId, business._id, {
       name: business.name,
-      website_url: business.website_url ?? undefined,
-      api_endpoint: business.api_endpoint ?? undefined,
-      business_type: business.business_type ?? undefined,
+      website_url: business.website_url,
+      api_endpoint: business.api_endpoint,
+      business_type: business.business_type,
       tasks: business.tasks,
     });
     await Business.updateOne({ _id: businessId }, { hubId: hub._id });

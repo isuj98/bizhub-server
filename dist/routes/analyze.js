@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { getBusinessById } from '../store.js';
+import { Business } from '../models/Business.js';
+import { getHubById } from '../services/hubService.js';
 import { probeWebsite, probeServer } from '../lib/fetchSite.js';
 import { analyzeWithGemini } from '../lib/analyzeWithGemini.js';
 import { analyzeWithOpenAI } from '../lib/analyzeWithOpenAI.js';
 import { validateUrl } from '../lib/urlUtils.js';
 import { assessContentQuality } from '../lib/contentQuality.js';
+import { authOptionalWhenNoDb } from '../middleware/auth.js';
+import { isDbConnected } from '../db.js';
 export const analyzeRouter = Router();
-/**
- * 1. Fetch page, 2. Use cleaned extracted content, 3. Run content-quality checks.
- * Returns null if fetch fails. Never returns raw URL for Gemini.
- */
+const requireAuthWhenDb = authOptionalWhenNoDb(isDbConnected);
 async function buildWebsiteExtraction(normalizedUrl) {
     const probe = await probeWebsite(normalizedUrl);
     const quality = assessContentQuality(probe.extractedContent, probe.status, probe.contentType);
@@ -20,17 +21,13 @@ async function buildWebsiteExtraction(normalizedUrl) {
         quality,
     };
 }
-analyzeRouter.post('/', async (req, res) => {
+analyzeRouter.post('/', requireAuthWhenDb, async (req, res) => {
     try {
         const body = req.body;
         const businessId = body?.businessId?.trim();
-        if (!businessId) {
-            res.status(400).json({ error: 'businessId is required' });
-            return;
-        }
-        const business = getBusinessById(businessId);
-        if (!business) {
-            res.status(404).json({ error: 'Business not found' });
+        const hubId = body?.hubId?.trim();
+        if (!businessId && !hubId) {
+            res.status(400).json({ error: 'businessId or hubId is required' });
             return;
         }
         const model = (body?.model?.trim() || 'gemini').toLowerCase();
@@ -49,10 +46,53 @@ analyzeRouter.post('/', async (req, res) => {
             });
             return;
         }
-        const websiteUrlRaw = business.website_url?.trim();
+        let businessName;
+        let businessType;
+        let websiteUrlRaw;
+        let apiEndpoint;
+        if (hubId && isDbConnected() && req.user) {
+            const hubData = await getHubById(hubId, req.user._id);
+            if (!hubData) {
+                res.status(404).json({ error: 'Hub not found' });
+                return;
+            }
+            const nd = hubData.normalizedData;
+            businessName = nd.title ?? nd.name ?? 'Unknown';
+            businessType = nd.businessType;
+            websiteUrlRaw = nd.website_url;
+            apiEndpoint = nd.api_endpoint;
+        }
+        else if (businessId) {
+            if (isDbConnected() && req.user) {
+                const business = await Business.findOne({ _id: businessId, userId: req.user._id }).lean();
+                if (!business) {
+                    res.status(404).json({ error: 'Business not found' });
+                    return;
+                }
+                businessName = business.name;
+                businessType = business.business_type;
+                websiteUrlRaw = business.website_url;
+                apiEndpoint = business.api_endpoint;
+            }
+            else {
+                const business = getBusinessById(businessId);
+                if (!business) {
+                    res.status(404).json({ error: 'Business not found' });
+                    return;
+                }
+                businessName = business.name;
+                businessType = business.business_type;
+                websiteUrlRaw = business.website_url;
+                apiEndpoint = business.api_endpoint;
+            }
+        }
+        else {
+            res.status(400).json({ error: 'businessId or hubId is required' });
+            return;
+        }
         let websiteExtraction = null;
-        if (websiteUrlRaw) {
-            const validation = validateUrl(websiteUrlRaw);
+        if (websiteUrlRaw?.trim()) {
+            const validation = validateUrl(websiteUrlRaw.trim());
             if (!validation.valid) {
                 res.status(400).json({
                     error: `Invalid website URL: ${validation.reason}. Analysis uses extracted content only, not raw URLs.`,
@@ -67,11 +107,10 @@ analyzeRouter.post('/', async (req, res) => {
             }
         }
         let serverProbe = null;
-        const apiEndpoint = business.api_endpoint?.trim();
-        if (apiEndpoint) {
-            const apiValidation = validateUrl(apiEndpoint);
+        if (apiEndpoint?.trim()) {
+            const apiValidation = validateUrl(apiEndpoint.trim());
             const websiteValidation = websiteUrlRaw ? validateUrl(websiteUrlRaw) : null;
-            const websiteNorm = websiteValidation && websiteValidation.valid ? websiteValidation.normalized : '';
+            const websiteNorm = websiteValidation?.valid ? websiteValidation.normalized : '';
             if (apiValidation.valid && apiValidation.normalized !== websiteNorm) {
                 try {
                     const probe = await probeServer(apiValidation.normalized);
@@ -88,14 +127,14 @@ analyzeRouter.post('/', async (req, res) => {
         }
         const { tasks, recommendations, extractionMetadata } = model === 'openai'
             ? await analyzeWithOpenAI(apiKey, {
-                businessName: business.name,
-                businessType: body.businessType?.trim(),
+                businessName,
+                businessType: businessType ?? body.businessType?.trim(),
                 website: websiteExtraction,
                 serverProbe,
             })
             : await analyzeWithGemini(apiKey, {
-                businessName: business.name,
-                businessType: body.businessType?.trim(),
+                businessName,
+                businessType: businessType ?? body.businessType?.trim(),
                 website: websiteExtraction,
                 serverProbe,
             });

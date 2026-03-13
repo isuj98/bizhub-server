@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 const MODEL = 'gpt-4o';
 function stripHtmlToText(html, maxLength = 8000) {
     const text = html

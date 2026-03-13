@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 
 const MODEL = 'gpt-4o';
 

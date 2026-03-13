@@ -17,7 +17,7 @@ import type { AuthReq } from '../middleware/auth.js';
 export const businessesRouter = Router();
 const requireAuthWhenDb = authOptionalWhenNoDb(isDbConnected);
 
-function toApiBusiness(b: { _id: unknown; name: string; status?: string; tasks?: unknown[]; website_url?: string | null; api_endpoint?: string | null; business_type?: string | null }) {
+function toApiBusiness(b: { _id: unknown; name: string; status?: string; tasks?: unknown[]; website_url?: string; api_endpoint?: string; business_type?: string }) {
   const id = typeof b._id === 'object' && b._id && 'toString' in b._id ? (b._id as { toString(): string }).toString() : String(b._id);
   return {
     id,
@@ -100,9 +100,9 @@ businessesRouter.post('/', requireAuthWhenDb, async (req: Request, res: Response
         business._id,
         {
           name: business.name,
-          website_url: business.website_url ?? undefined,
-          api_endpoint: business.api_endpoint ?? undefined,
-          business_type: business.business_type ?? undefined,
+          website_url: business.website_url,
+          api_endpoint: business.api_endpoint,
+          business_type: business.business_type,
           tasks: business.tasks,
         }
       );

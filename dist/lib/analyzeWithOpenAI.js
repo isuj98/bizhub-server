@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 import { buildAnalysisPrompt, safeParseAnalysisResponse, } from './analyzeWithGemini.js';
 const MODEL = 'gpt-4o';
 function toTask(raw, index) {
