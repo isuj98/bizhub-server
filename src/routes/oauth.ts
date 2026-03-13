@@ -15,12 +15,27 @@ function addPendingCode(code: string, userId: string): void {
   pendingCodes.set(code, { userId, createdAt: Date.now() });
 }
 
+function safeHost(urlStr: string | undefined): string | null {
+  if (!urlStr) return null;
+  try {
+    return new URL(urlStr).host;
+  } catch {
+    return 'invalid_url';
+  }
+}
+
 oauthRouter.get('/authorize', (req: Request, res: Response): void => {
   const ott = (req.query.ott as string)?.trim();
   const redirectUri = (req.query.redirect_uri as string)?.trim();
   const state = (req.query.state as string) ?? '';
   const responseType = (req.query.response_type as string) ?? 'code';
+  // #region agent log
+  fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H1',location:'routes/oauth.ts:/authorize:entry',message:'Authorize request received',data:{hasOtt:!!ott,hasRedirectUri:!!redirectUri,responseType,hasClientId:typeof req.query.client_id==='string',redirectHost:safeHost(redirectUri)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!redirectUri) {
+    // #region agent log
+    fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H4',location:'routes/oauth.ts:/authorize:missing_redirect',message:'Authorize rejected missing redirect_uri',data:{stateLength:state.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     res.status(400).send('redirect_uri is required');
     return;
   }
@@ -33,6 +48,9 @@ oauthRouter.get('/authorize', (req: Request, res: Response): void => {
     const decoded = jwt.verify(ott, JWT_SECRET) as { userId: string; email: string };
     userId = decoded.userId;
   } catch {
+    // #region agent log
+    fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H1',location:'routes/oauth.ts:/authorize:ott_invalid',message:'Authorize rejected due to invalid/missing ott JWT',data:{hasOtt:!!ott},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     res.status(400).send('Invalid or expired authorization request. Please try "Connect Zapier" again.');
     return;
   }
@@ -40,6 +58,9 @@ oauthRouter.get('/authorize', (req: Request, res: Response): void => {
   addPendingCode(code, userId);
   const sep = redirectUri.includes('?') ? '&' : '?';
   const location = `${redirectUri}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+  // #region agent log
+  fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H2',location:'routes/oauth.ts:/authorize:success',message:'Authorization code issued',data:{codePrefix:code.slice(0,12),redirectHost:safeHost(redirectUri)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   res.redirect(302, location);
 });
 
@@ -48,9 +69,15 @@ oauthRouter.post('/token', async (req: Request, res: Response): Promise<void> =>
   const grantType = (body?.grant_type as string)?.trim();
   const code = (body?.code as string)?.trim();
   const refreshToken = (body?.refresh_token as string)?.trim();
+  // #region agent log
+  fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H3',location:'routes/oauth.ts:/token:entry',message:'Token endpoint called',data:{grantType:grantType??null,contentType:req.headers['content-type']??null,hasCode:!!code,hasRefreshToken:!!refreshToken,hasBodyClientId:typeof body?.client_id==='string',hasBasicAuth:typeof req.headers.authorization==='string'&&req.headers.authorization.startsWith('Basic ')},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (grantType === 'authorization_code' && code) {
     const pending = pendingCodes.get(code);
     if (!pending) {
+      // #region agent log
+      fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H2',location:'routes/oauth.ts:/token:invalid_code',message:'Token exchange failed due to missing pending code',data:{codePrefix:code.slice(0,12)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid or expired code' });
       return;
     }
