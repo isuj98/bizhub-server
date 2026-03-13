@@ -20,16 +20,19 @@ zapsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
     const userId = (req as AuthReq).user._id;
     const list = await Zap.find({ userId }).lean();
     res.json(
-      list.map((z) => ({
-        id: (z as { _id: unknown })._id?.toString?.() ?? (z as { _id: unknown })._id,
-        name: (z as { name: string }).name,
-        zapierZapId: (z as { zapierZapId?: string }).zapierZapId,
-        triggerConfig: (z as { triggerConfig?: unknown }).triggerConfig,
-        actionConfig: (z as { actionConfig?: unknown }).actionConfig,
-        hubId: (z as { hubId?: unknown }).hubId?.toString?.() ?? (z as { hubId?: unknown }).hubId,
-        status: (z as { status?: string }).status,
-        createdAt: (z as { createdAt?: string }).createdAt,
-      }))
+      list.map((z) => {
+        const createdAt = (z as { createdAt?: Date | string }).createdAt;
+        return {
+          id: (z as { _id: unknown })._id?.toString?.() ?? (z as { _id: unknown })._id,
+          name: (z as { name: string }).name,
+          zapierZapId: (z as { zapierZapId?: string }).zapierZapId,
+          triggerConfig: (z as { triggerConfig?: unknown }).triggerConfig,
+          actionConfig: (z as { actionConfig?: unknown }).actionConfig,
+          hubId: (z as { hubId?: unknown }).hubId?.toString?.() ?? (z as { hubId?: unknown }).hubId,
+          status: (z as { status?: string }).status,
+          createdAt: createdAt instanceof Date ? createdAt.toISOString() : (createdAt ?? ''),
+        };
+      })
     );
   } catch (err) {
     res.status(500).json({ error: 'Failed to list zaps' });
