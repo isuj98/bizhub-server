@@ -9,6 +9,21 @@ export const zapierRouter = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'bizhub-dev-secret-change-in-production';
 
+function getPublicBaseUrl(req: Request): string {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim();
+  const proto = forwardedProto || req.protocol || 'https';
+  const host = req.get('host');
+  return `${proto}://${host ?? 'localhost:5001'}`;
+}
+
+/** Zapier OAuth v2 authorize URL compatibility (configured as /zapier). */
+zapierRouter.get('/', (req: Request, res: Response): void => {
+  const queryIndex = req.originalUrl.indexOf('?');
+  const rawQuery = queryIndex >= 0 ? req.originalUrl.slice(queryIndex + 1) : '';
+  const location = `${getPublicBaseUrl(req)}/oauth/authorize${rawQuery ? `?${rawQuery}` : ''}`;
+  res.redirect(302, location);
+});
+
 /** Zapier OAuth 2.0 (Powered by Zapier / User Access Token) */
 const ZAPIER_AUTH_URL = 'https://api.zapier.com/v2/authorize';
 const ZAPIER_TOKEN_URL = 'https://zapier.com/oauth/token/';
