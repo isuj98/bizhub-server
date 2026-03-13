@@ -24,7 +24,8 @@ zapsRouter.get('/', async (req, res) => {
             actionConfig: z.actionConfig,
             hubId: z.hubId?.toString?.() ?? z.hubId,
             status: z.status,
-            createdAt: z.createdAt,
+            createdAt: z.createdAt?.toString?.() ??
+                z.createdAt,
         })));
     }
     catch (err) {

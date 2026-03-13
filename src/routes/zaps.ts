@@ -28,7 +28,9 @@ zapsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
         actionConfig: (z as { actionConfig?: unknown }).actionConfig,
         hubId: (z as { hubId?: unknown }).hubId?.toString?.() ?? (z as { hubId?: unknown }).hubId,
         status: (z as { status?: string }).status,
-        createdAt: (z as { createdAt?: string }).createdAt,
+        createdAt:
+          (z as { createdAt?: Date | string }).createdAt?.toString?.() ??
+          (z as { createdAt?: unknown }).createdAt,
       }))
     );
   } catch (err) {
