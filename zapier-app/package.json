@@ -1,0 +1,21 @@
+{
+  "name": "bizhub-zapier-app",
+  "version": "1.0.0",
+  "description": "BusinessHub Zapier integration",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "zapier build",
+    "test": "zapier test",
+    "validate": "zapier validate",
+    "push": "zapier push"
+  },
+  "dependencies": {
+    "zapier-platform-core": "18.2.2"
+  },
+  "devDependencies": {
+    "zapier-platform-cli": "18.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
