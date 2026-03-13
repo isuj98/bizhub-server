@@ -14,9 +14,6 @@ export type AuthReq = Request & { user: { _id: string; email: string } };
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  // #region agent log
-  fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H5',location:'middleware/auth.ts:authMiddleware:entry',message:'authMiddleware invoked',data:{path:req.path,hasBearer:!!token,tokenPrefix:token?token.slice(0,8):null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!token) {
     res.status(401).json({ error: 'Authentication required' });
     return;
@@ -33,10 +30,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       email: user.email,
     };
     next();
-  } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7727/ingest/0e857ef2-7b55-4cae-bc3c-ddc8e8541315',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0c1830'},body:JSON.stringify({sessionId:'0c1830',runId:'initial',hypothesisId:'H5',location:'middleware/auth.ts:authMiddleware:verify_failed',message:'JWT verification failed',data:{path:req.path,errorName:err instanceof Error?err.name:'unknown',errorMessage:err instanceof Error?err.message:'unknown'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+  } catch {
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

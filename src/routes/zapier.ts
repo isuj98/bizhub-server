@@ -9,6 +9,13 @@ export const zapierRouter = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'bizhub-dev-secret-change-in-production';
 
+/** Zapier OAuth v2 authorize URL compatibility (configured as /zapier). */
+zapierRouter.get('/', (req: Request, res: Response): void => {
+  const params = new URLSearchParams(req.query as Record<string, string>);
+  const location = `/oauth/authorize${params.toString() ? `?${params.toString()}` : ''}`;
+  res.redirect(302, location);
+});
+
 /** Zapier OAuth 2.0 (Powered by Zapier / User Access Token) */
 const ZAPIER_AUTH_URL = 'https://api.zapier.com/v2/authorize';
 const ZAPIER_TOKEN_URL = 'https://zapier.com/oauth/token/';

@@ -9,8 +9,11 @@ import { zapierRouter } from './routes/zapier.js';
 import { oauthRouter } from './routes/oauth.js';
 import { zapsRouter } from './routes/zaps.js';
 import { hubsRouter } from './routes/hubs.js';
-import { authMiddleware, type AuthReq } from './middleware/auth.js';
+import { type AuthReq } from './middleware/auth.js';
 import { isDbConnected } from './db.js';
+import { verifyOAuthAccessToken } from './routes/oauth.js';
+import jwt from 'jsonwebtoken';
+import { User } from './models/User.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 5001;
@@ -27,13 +30,44 @@ app.use('/oauth', oauthRouter);
 app.use('/api/zaps', zapsRouter);
 app.use('/api/hubs', hubsRouter);
 
-app.get('/api/me', authMiddleware, (req, res) => {
-  if (!isDbConnected()) {
-    res.status(503).json({ error: 'Database not available' });
+const JWT_SECRET = process.env.JWT_SECRET ?? 'bizhub-dev-secret-change-in-production';
+
+app.get('/api/me', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!token) {
+    res.status(401).json({ error: 'Missing bearer token' });
     return;
   }
-  const user = (req as AuthReq).user;
-  res.json({ id: user._id, email: user.email });
+
+  const oauthIdentity = verifyOAuthAccessToken(token);
+  if (oauthIdentity) {
+    res.json({ id: oauthIdentity.userId, email: oauthIdentity.email });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId?: string; email?: string };
+    if (!decoded.userId || !decoded.email) {
+      res.status(401).json({ error: 'Invalid or expired token' });
+      return;
+    }
+    if (!isDbConnected()) {
+      res.json({ id: decoded.userId, email: decoded.email });
+      return;
+    }
+    const user = await User.findById(decoded.userId).lean();
+    if (!user) {
+      res.status(401).json({ error: 'User not found' });
+      return;
+    }
+    const authReq = req as AuthReq;
+    authReq.user = { _id: user._id.toString(), email: user.email };
+    res.json({ id: authReq.user._id, email: authReq.user.email });
+    return;
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
 });
 
 app.get('/health', (_req, res) => {
